@@ -1,157 +1,96 @@
 import 'dart:async';
-import 'dart:io';
-
-import 'package:camera/camera.dart';
+import 'package:draggable_widget/draggable_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:camera/camera.dart';
 
-void main() {
-  runApp(MyApp());
+List<CameraDescription> cameras;
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  cameras = await availableCameras();
+  runApp(CameraApp());
 }
 
-class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
+class CameraApp extends StatefulWidget {
+  @override
+  _CameraAppState createState() => _CameraAppState();
+}
+
+class _CameraAppState extends State<CameraApp> {
+  
+
   @override
   Widget build(BuildContext context) {
+    
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
-        // This makes the visual density adapt to the platform that you run
-        // the app on. For desktop platforms, the controls will be smaller and
-        // closer together (more dense) than on mobile platforms.
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      debugShowCheckedModeBanner: false,
+      home: CamScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  final String title;
-
+class CamScreen extends StatefulWidget {
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  _CamScreenState createState() => _CamScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _CamScreenState extends State<CamScreen> {
   CameraController controller;
-  CameraDescription cameraDescription;
-  Timer timer;
+
+  DragController dragController = DragController();
 
   @override
   void initState() {
     super.initState();
-    _getCameras();
-  }
-
-  _getCameras() async {
-    try {
-      WidgetsFlutterBinding.ensureInitialized();
-      var cameras = await availableCameras();
-      for (int i = 0; i < cameras.length; i++) {
-        if (cameras[i].lensDirection == CameraLensDirection.front) {
-          onNewCameraSelected(cameras[i]);
-          break;
-        }
+    controller = CameraController(cameras[1], ResolutionPreset.max);
+    controller.initialize().then((_) {
+      if (!mounted) {
+        return;
       }
-    } on CameraException catch (e) {
-      print(e);
-    }
-  }
-
-  void onNewCameraSelected(CameraDescription cameraDescription) async {
-    if (controller != null) {
-      await controller.dispose();
-    }
-    controller = CameraController(
-      cameraDescription,
-      ResolutionPreset.high,
-      enableAudio: false,
-    );
-    this.cameraDescription = cameraDescription;
-
-    // If the controller is updated then update the UI.
-    controller.addListener(() {
-      if (mounted) setState(() {});
-      if (controller.value.hasError) {
-        print(controller.value.errorDescription);
-      }
+      setState(() {});
     });
-
-    try {
-      await controller.initialize();
-      await controller.startImageStream(_processImage);
-    } on CameraException catch (e) {
-      print(e.toString());
-    }
   }
 
-  _processImage(CameraImage cameraImage) async {
-    try {
-      timer = Timer.periodic(Duration(seconds: 15), (Timer t) async {
-        File _f = await takePicture();
-        print(_f.path.toString());
-      });
-    } catch (e) {
-      print(e);
-    }
-  }
-
-  String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
-
-  Future<File> takePicture() async {
-    if (!controller.value.isInitialized) {
-      print('Error: select a camera first.');
-      return null;
-    }
-    final Directory extDir = await getApplicationDocumentsDirectory();
-    final String dirPath = '${extDir.path}/Pictures/';
-    await Directory(dirPath).create(recursive: true);
-    final String filePath = '$dirPath/${timestamp()}.jpg';
-
-    if (controller.value.isTakingPicture) {
-      // A capture is already pending, do nothing.
-      return null;
-    }
-
-    try {
-      await controller.takePicture(filePath);
-    } on CameraException catch (e) {
-      print(e);
-      return null;
-    }
-    return File(filePath);
+  @override
+  void dispose() {
+    controller?.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+  Size size=MediaQuery.of(context).size;
+   if (!controller.value.isInitialized) {
+     print('not');
+      return Container();
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text('sample'),
-      ),
-      body: Stack(
-        children: [
-          Container(
-            height: MediaQuery.of(context).size.height,
-            width: MediaQuery.of(context).size.width,
-            child: Column(
-              children: [],
-            ),
+     body: Stack(
+       children: [
+         Container(
+          height:size.height,
+          width: size.width,
+          color: Colors.red,
+         ),
+       
+
+          DraggableWidget(
+            bottomMargin: 10,
+            topMargin: 10,
+            intialVisibility: true,
+            horizontalSapce: 10,
+            child:Container(
+             height: size.height*0.25,
+             width: size.width*0.25,
+             child: CameraPreview(controller)),
+            initialPosition: AnchoringPosition.bottomLeft,
+            dragController: dragController,
           )
-        ],
-      ),
+
+       ],
+     ),
     );
   }
 }
