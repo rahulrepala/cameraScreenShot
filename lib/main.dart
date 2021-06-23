@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:draggable_widget/draggable_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:path_provider/path_provider.dart';
 
 List<CameraDescription> cameras;
 
@@ -36,9 +38,11 @@ class CamScreen extends StatefulWidget {
 }
 
 class _CamScreenState extends State<CamScreen> {
+  
   CameraController controller;
-
   DragController dragController = DragController();
+  bool started=false;
+  List takenPhotos=[];
 
   @override
   void initState() {
@@ -52,6 +56,43 @@ class _CamScreenState extends State<CamScreen> {
     });
   }
 
+String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
+
+  Future<File> capturePicture() async {
+    if (!controller.value.isInitialized) {
+      print('Error: select a camera first.');
+      return null;
+    }
+   
+   // change path code and run
+
+    final Directory extDir = await getApplicationDocumentsDirectory();
+    final String dirPath = '${extDir.path}/Pictures/';
+    await Directory(dirPath).create(recursive: true);
+    final String filePath = '$dirPath/${timestamp()}.jpg';
+
+    if (controller.value.isTakingPicture) {
+      // A capture is already pending, do nothing.
+      return null;
+    }
+    try {
+      await controller.stopImageStream();
+      //FIXME hacky technique to avoid having black screen on some android devices
+     //await Future.delayed(Duration(milliseconds: 200));
+      await controller.takePicture(filePath);
+    } on CameraException catch (e) {
+      print(e);
+      return null;
+    }
+    return File(filePath);
+  }
+
+  void captureImages() async{
+    File _f = await capturePicture();
+    takenPhotos.add(_f.path.toString());
+    setState(() {});
+  }
+
   @override
   void dispose() {
     controller?.dispose();
@@ -62,9 +103,17 @@ class _CamScreenState extends State<CamScreen> {
   Widget build(BuildContext context) {
   Size size=MediaQuery.of(context).size;
    if (!controller.value.isInitialized) {
-     print('not');
+        started=false;
+        setState(() {});
       return Container();
-    }
+   
+    }else{
+     
+     if(started==false){
+        started=true;
+        captureImages();
+        setState(() {});
+     }
 
     return Scaffold(
      body: Stack(
@@ -73,6 +122,13 @@ class _CamScreenState extends State<CamScreen> {
           height:size.height,
           width: size.width,
           color: Colors.red,
+          child: ListView.builder(
+            itemCount: takenPhotos.length,
+            itemBuilder: (context,index){
+              return ListTile(
+                title: Text(takenPhotos[index]),
+              );
+             }),
          ),
        
 
@@ -92,5 +148,8 @@ class _CamScreenState extends State<CamScreen> {
        ],
      ),
     );
+
+    }
+
   }
 }
