@@ -20,11 +20,8 @@ class CameraApp extends StatefulWidget {
 }
 
 class _CameraAppState extends State<CameraApp> {
-  
-
   @override
   Widget build(BuildContext context) {
-    
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: CamScreen(),
@@ -38,11 +35,10 @@ class CamScreen extends StatefulWidget {
 }
 
 class _CamScreenState extends State<CamScreen> {
-  
   CameraController controller;
   DragController dragController = DragController();
-  bool started=false;
-  List takenPhotos=[];
+  bool started = false;
+  List takenPhotos = [];
 
   @override
   void initState() {
@@ -56,30 +52,18 @@ class _CamScreenState extends State<CamScreen> {
     });
   }
 
-String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
+  String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
 
   Future<File> capturePicture() async {
-    if (!controller.value.isInitialized) {
-      print('Error: select a camera first.');
-      return null;
-    }
-   
-   // change path code and run
-
     final Directory extDir = await getApplicationDocumentsDirectory();
-    final String dirPath = '${extDir.path}/Pictures/';
-    await Directory(dirPath).create(recursive: true);
-    final String filePath = '$dirPath/${timestamp()}.jpg';
+    final String filePath = '${extDir.path}/${timestamp()}.png';
 
-    if (controller.value.isTakingPicture) {
-      // A capture is already pending, do nothing.
-      return null;
-    }
+    print('fileeeee' + filePath.toString());
+
     try {
-      await controller.stopImageStream();
-      //FIXME hacky technique to avoid having black screen on some android devices
-     //await Future.delayed(Duration(milliseconds: 200));
-      await controller.takePicture(filePath);
+      await controller.takePicture(filePath).then((value) {
+        print('capturedddd');
+      });
     } on CameraException catch (e) {
       print(e);
       return null;
@@ -87,10 +71,18 @@ String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
     return File(filePath);
   }
 
-  void captureImages() async{
-    File _f = await capturePicture();
-    takenPhotos.add(_f.path.toString());
-    setState(() {});
+  void captureImages() async {
+    const fiveSec = const Duration(seconds: 5);
+    new Timer.periodic(fiveSec, (Timer t) async {
+      await capturePicture().then((value) {
+        print(value);
+        if (value != null) {
+          takenPhotos.add(value.path.toString());
+        }
+        setState(() {});
+        print('TAKEN');
+      });
+    });
   }
 
   @override
@@ -101,55 +93,50 @@ String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
 
   @override
   Widget build(BuildContext context) {
-  Size size=MediaQuery.of(context).size;
-   if (!controller.value.isInitialized) {
-        started=false;
-        setState(() {});
+    Size size = MediaQuery.of(context).size;
+    if (!controller.value.isInitialized) {
+      started = false;
+      setState(() {});
       return Container();
-   
-    }else{
-     
-     if(started==false){
-        started=true;
+    } else {
+      if (started == false) {
+        started = true;
         captureImages();
         setState(() {});
-     }
+      }
 
-    return Scaffold(
-     body: Stack(
-       children: [
-         Container(
-          height:size.height,
-          width: size.width,
-          color: Colors.red,
-          child: ListView.builder(
-            itemCount: takenPhotos.length,
-            itemBuilder: (context,index){
-              return ListTile(
-                title: Text(takenPhotos[index]),
-              );
-             }),
-         ),
-       
-
-          DraggableWidget(
-            bottomMargin: 10,
-            topMargin: 10,
-            intialVisibility: true,
-            horizontalSapce: 10,
-            child:Container(
-             height: size.height*0.25,
-             width: size.width*0.25,
-             child: CameraPreview(controller)),
-            initialPosition: AnchoringPosition.bottomLeft,
-            dragController: dragController,
-          )
-
-       ],
-     ),
-    );
-
+      return Scaffold(
+        body: Stack(
+          children: [
+            Container(
+              height: size.height,
+              width: size.width,
+              color: Colors.red,
+              child: ListView.builder(
+                  itemCount: takenPhotos.length,
+                  itemBuilder: (context, index) {
+                    return Card(
+                      child: ListTile(
+                        title: Text(takenPhotos[index]),
+                      ),
+                    );
+                  }),
+            ),
+            DraggableWidget(
+              bottomMargin: 10,
+              topMargin: 10,
+              intialVisibility: true,
+              horizontalSapce: 10,
+              child: Container(
+                  height: size.height * 0.25,
+                  width: size.width * 0.25,
+                  child: CameraPreview(controller)),
+              initialPosition: AnchoringPosition.bottomLeft,
+              dragController: dragController,
+            )
+          ],
+        ),
+      );
     }
-
   }
 }
